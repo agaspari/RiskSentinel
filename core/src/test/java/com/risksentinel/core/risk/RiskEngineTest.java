@@ -147,6 +147,47 @@ class RiskEngineTest {
     }
 
     // ──────────────────────────────────────────────
+    // Per-symbol positions + gross exposure (Task 3.0)
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Snapshot enrichment for gateway")
+    class SnapshotEnrichment {
+
+        @Test
+        void shouldExposePositionsMap_keyedBySymbol() {
+            Position aapl = pos("AAPL", 100, 150.0);
+            Position googl = pos("GOOGL", 50, 100.0);
+
+            RiskSnapshot snapshot = engine.compute("port-1", List.of(aapl, googl), INSTRUMENTS);
+
+            assertThat(snapshot.positions()).containsKeys("AAPL", "GOOGL");
+            assertThat(snapshot.positions().get("AAPL").quantity()).isEqualTo(100L);
+            assertThat(snapshot.positions().get("GOOGL").quantity()).isEqualTo(50L);
+        }
+
+        @Test
+        void shouldExposeGrossExposure_equalToSumOfAbsoluteValues() {
+            // 100 AAPL @ 150 = 15000 long; -50 GOOGL @ 100 = -5000 short
+            // gross = |15000| + |-5000| = 20000; net = 10000
+            Position p1 = pos("AAPL", 100, 150.0);
+            Position p2 = pos("GOOGL", -50, 100.0);
+
+            RiskSnapshot snapshot = engine.compute("port-1", List.of(p1, p2), INSTRUMENTS);
+
+            assertThat(snapshot.grossExposure()).isEqualTo(20000.0);
+            assertThat(snapshot.netExposure()).isEqualTo(10000.0);
+        }
+
+        @Test
+        void shouldReturnEmptyPositionsMap_whenNoPositions() {
+            RiskSnapshot snapshot = engine.compute("port-1", List.of(), INSTRUMENTS);
+            assertThat(snapshot.positions()).isEmpty();
+            assertThat(snapshot.grossExposure()).isEqualTo(0.0);
+        }
+    }
+
+    // ──────────────────────────────────────────────
     // Property tests
     // ──────────────────────────────────────────────
 

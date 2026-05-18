@@ -83,22 +83,45 @@ class DomainRecordsTest {
     @DisplayName("RiskSnapshot immutability")
     class RiskSnapshotImmutability {
 
+        private RiskSnapshot freshSnapshot() {
+            return new RiskSnapshot(
+                    "1", "10",
+                    .5, 1.0,
+                    new HashMap<>(),
+                    new HashMap<>(),
+                    new HashMap<>(),
+                    .2, .3, 1.1, Instant.now());
+        }
+
         @Test
         void shouldHaveUnmodifiableSectorExposureMap() {
-            RiskSnapshot riskSnapshot = new RiskSnapshot("1", "10", .5, new HashMap<>(),
-                    new HashMap<>(), .2, .3, 1.1, Instant.now());
-
-            assertThatThrownBy(() -> riskSnapshot.sectorExposure().put("A", 20.4))
+            assertThatThrownBy(() -> freshSnapshot().sectorExposure().put("A", 20.4))
                     .isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test
         void shouldHaveUnmodifiableRegionExposureMap() {
-            RiskSnapshot riskSnapshot = new RiskSnapshot("1", "10", .5, new HashMap<>(),
-                    new HashMap<>(), .2, .3, 1.1, Instant.now());
-
-            assertThatThrownBy(() -> riskSnapshot.regionExposure().put("A", 10.0))
+            assertThatThrownBy(() -> freshSnapshot().regionExposure().put("A", 10.0))
                     .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void shouldHaveUnmodifiablePositionsMap() {
+            Position p = new Position("port-1", "AAPL", 100, 150.0, 15000.0);
+            assertThatThrownBy(() -> freshSnapshot().positions().put("AAPL", p))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void shouldReject_whenGrossExposureNegative() {
+            assertThatThrownBy(() -> new RiskSnapshot(
+                    "1", "10",
+                    .5, -1.0,
+                    new HashMap<>(),
+                    new HashMap<>(),
+                    new HashMap<>(),
+                    .2, .3, 1.1, Instant.now()))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 
