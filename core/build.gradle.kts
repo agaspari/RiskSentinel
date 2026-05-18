@@ -25,6 +25,9 @@ dependencies {
 
     // AssertJ for fluent assertions
     testImplementation("org.assertj:assertj-core:3.27.3")
+
+    // Runtime launcher
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.test {

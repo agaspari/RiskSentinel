@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.*;
  */
 class RiskEngineTest {
 
-    private RiskEngine engine;
+    private RiskEngine engine = new SimpleRiskEngine();
 
     // Reference instruments
     private static final Instrument AAPL = new Instrument("AAPL", "Technology", "US", 150.0);
@@ -34,12 +34,6 @@ class RiskEngineTest {
             "AAPL", AAPL,
             "GOOGL", GOOGL,
             "JPM", JPM);
-
-    @BeforeEach
-    void setUp() {
-        // TODO: instantiate your RiskEngine implementation
-        // engine = new SimpleRiskEngine();
-    }
 
     // Helper to build a position
     private Position pos(String symbol, long qty, double avgCost) {

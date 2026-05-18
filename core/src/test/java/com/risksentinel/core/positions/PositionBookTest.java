@@ -116,8 +116,9 @@ class PositionBookTest {
             assertThat(pos.avgCost()).isEqualTo(150.0);
 
             book.apply(buy("port-1", "AAPL", 50, 170.0));
+            pos = book.getPosition("port-1", "AAPL").orElseThrow();
             assertThat(pos.quantity()).isEqualTo(120L);
-            assertThat(pos.avgCost()).isEqualTo(158.33, within(0.001));
+            assertThat(pos.avgCost()).isCloseTo(158.333, within(0.001));
         }
     }
 
