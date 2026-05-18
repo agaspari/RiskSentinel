@@ -26,6 +26,10 @@ dependencies {
     // AssertJ for fluent assertions
     testImplementation("org.assertj:assertj-core:3.27.3")
 
+    // Concurrency testing
+    testImplementation("org.openjdk.jcstress:jcstress-core:0.16")
+    testAnnotationProcessor("org.openjdk.jcstress:jcstress-core:0.16")
+
     // Runtime launcher
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

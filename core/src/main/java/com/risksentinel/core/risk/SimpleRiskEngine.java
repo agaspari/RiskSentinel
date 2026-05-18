@@ -21,11 +21,12 @@ public class SimpleRiskEngine implements RiskEngine {
         Map<String, Double> regionExposure = new HashMap<>();
         
         for (Position pos : positions) {
-            double value = pos.marketValue();
+            Instrument instrument = instruments.get(pos.symbol());
+            double value = instrument != null ? pos.quantity() * instrument.price() : pos.marketValue();
+            
             netExposure += value;
             grossExposure += Math.abs(value);
             
-            Instrument instrument = instruments.get(pos.symbol());
             if (instrument != null) {
                 sectorExposure.merge(instrument.sector(), Math.abs(value), Double::sum);
                 regionExposure.merge(instrument.region(), Math.abs(value), Double::sum);
@@ -35,7 +36,9 @@ public class SimpleRiskEngine implements RiskEngine {
         double hhi = 0.0;
         if (grossExposure > 0.0) {
             for (Position pos : positions) {
-                double weight = Math.abs(pos.marketValue()) / grossExposure;
+                Instrument instrument = instruments.get(pos.symbol());
+                double value = instrument != null ? pos.quantity() * instrument.price() : pos.marketValue();
+                double weight = Math.abs(value) / grossExposure;
                 hhi += weight * weight;
             }
         }
