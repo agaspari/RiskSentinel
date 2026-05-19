@@ -16,6 +16,18 @@ repositories {
 }
 
 dependencies {
+    // Latency measurement (Phase 5)
+    implementation("org.hdrhistogram:HdrHistogram:2.2.2")
+
+    // Metrics (Phase 5)
+    implementation("io.micrometer:micrometer-core:1.12.13")
+    implementation("io.micrometer:micrometer-registry-prometheus:1.12.13")
+
+    // Structured logging (Phase 5)
+    implementation("org.slf4j:slf4j-api:2.0.16")
+    implementation("ch.qos.logback:logback-classic:1.5.12")
+    implementation("net.logstash.logback:logstash-logback-encoder:8.0")
+
     // Testing
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")

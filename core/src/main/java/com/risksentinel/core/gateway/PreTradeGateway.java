@@ -3,7 +3,14 @@ package com.risksentinel.core.gateway;
 import com.risksentinel.core.domain.Instrument;
 import com.risksentinel.core.domain.RiskSnapshot;
 import com.risksentinel.core.domain.TradeProposal;
+import com.risksentinel.core.ops.LatencyRecorder;
+import com.risksentinel.core.ops.MdcScope;
+import com.risksentinel.core.ops.MetricsRegistry;
+import com.risksentinel.core.ops.NoopMetricsRegistry;
+import com.risksentinel.core.ops.Tags;
 import com.risksentinel.core.risk.RiskSnapshotCache;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -31,24 +38,32 @@ import java.util.Objects;
  */
 public final class PreTradeGateway {
 
+    private static final Logger log = LoggerFactory.getLogger(PreTradeGateway.class);
+
     private final RiskSnapshotCache snapshotCache;
     private final Map<String, Instrument> instrumentRegistry;
     private final GatewayLimits limits;
     private final GatewayState state;
     private final List<RiskCheck> checks;
     private final Clock clock;
+    private final LatencyRecorder decideLatency;
+    private final MetricsRegistry metrics;
 
     public PreTradeGateway(
             RiskSnapshotCache snapshotCache,
             Map<String, Instrument> instrumentRegistry,
             GatewayLimits limits,
             GatewayState state,
-            Clock clock) {
+            Clock clock,
+            LatencyRecorder decideLatency,
+            MetricsRegistry metrics) {
         this.snapshotCache = Objects.requireNonNull(snapshotCache, "snapshotCache");
         this.instrumentRegistry = Map.copyOf(Objects.requireNonNull(instrumentRegistry, "instrumentRegistry"));
         this.limits = Objects.requireNonNull(limits, "limits");
         this.state = Objects.requireNonNull(state, "state");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.decideLatency = Objects.requireNonNull(decideLatency, "decideLatency");
+        this.metrics = Objects.requireNonNull(metrics, "metrics");
         this.checks = List.of(
                 new KillSwitchCheck(),
                 new IdempotencyCheck(),
@@ -58,6 +73,28 @@ public final class PreTradeGateway {
                 new ConcentrationCheck());
     }
 
+    public PreTradeGateway(
+            RiskSnapshotCache snapshotCache,
+            Map<String, Instrument> instrumentRegistry,
+            GatewayLimits limits,
+            GatewayState state,
+            Clock clock,
+            LatencyRecorder decideLatency) {
+        this(snapshotCache, instrumentRegistry, limits, state, clock, decideLatency,
+                new NoopMetricsRegistry());
+    }
+
+    public PreTradeGateway(
+            RiskSnapshotCache snapshotCache,
+            Map<String, Instrument> instrumentRegistry,
+            GatewayLimits limits,
+            GatewayState state,
+            Clock clock) {
+        this(snapshotCache, instrumentRegistry, limits, state, clock,
+                LatencyRecorder.noop("gateway-decide-nanos"),
+                new NoopMetricsRegistry());
+    }
+
     /** Convenience for tests that don't supply a clock. */
     public PreTradeGateway(
             RiskSnapshotCache snapshotCache,
@@ -65,6 +102,11 @@ public final class PreTradeGateway {
             GatewayLimits limits,
             GatewayState state) {
         this(snapshotCache, instrumentRegistry, limits, state, Clock.systemUTC());
+    }
+
+    /** Latency recorder for decide() — useful for ops dashboards. */
+    public LatencyRecorder decideLatency() {
+        return decideLatency;
     }
 
     /** Direct access to the kill switch for ops endpoints. */
@@ -78,6 +120,48 @@ public final class PreTradeGateway {
      */
     public GatewayDecision decide(TradeProposal proposal) {
         Objects.requireNonNull(proposal, "proposal cannot be null");
+        long startNanos = System.nanoTime();
+        try (MdcScope ignored = MdcScope.of(
+                "portfolioId", proposal.portfolioId(),
+                "proposalId", proposal.proposalId(),
+                "snapshotId", proposal.snapshotId())) {
+            GatewayDecision decision = decideInternal(proposal);
+            recordDecisionMetric(decision);
+            if (log.isDebugEnabled()) {
+                try (MdcScope ignored2 = MdcScope.of("decisionCode",
+                        decision instanceof GatewayDecision.Reject r && !r.reasons().isEmpty()
+                                ? r.reasons().get(0).code().name()
+                                : "ACCEPT")) {
+                    log.debug("Gateway decision made");
+                }
+            }
+            return decision;
+        } finally {
+            decideLatency.recordNanos(System.nanoTime() - startNanos);
+        }
+    }
+
+    private void recordDecisionMetric(GatewayDecision decision) {
+        String decisionLabel;
+        String codeLabel;
+        if (decision instanceof GatewayDecision.Accept) {
+            decisionLabel = "accept";
+            codeLabel = "none";
+        } else if (decision instanceof GatewayDecision.Reject reject) {
+            decisionLabel = "reject";
+            codeLabel = reject.reasons().isEmpty()
+                    ? "unknown"
+                    : reject.reasons().get(0).code().name();
+        } else {
+            return;
+        }
+        metrics.counter(
+                "gateway_decide_total",
+                Tags.of("decision", decisionLabel, "code", codeLabel)
+        ).increment();
+    }
+
+    private GatewayDecision decideInternal(TradeProposal proposal) {
         Instant now = clock.instant();
 
         RiskSnapshot snapshot = snapshotCache.getSnapshot(proposal.portfolioId()).orElse(null);

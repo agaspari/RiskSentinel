@@ -4,7 +4,13 @@
       "Bash(./gradlew :core:test --tests \"com.risksentinel.core.broker.*\")",
       "Bash(./gradlew :core:test)",
       "Bash(./gradlew :core:test --tests \"com.risksentinel.core.PipelineFillLoopTest\")",
-      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.RiskPipelineTest\")"
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.RiskPipelineTest\")",
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.ops.BoundedIdempotencyCacheTest\")",
+      "Bash(awk -F'\"' '{print $2, $4, $6, $8}')",
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.ops.BoundedOrderHistoryTest\")",
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.ops.LatencyRecorderTest\")",
+      "Bash(./gradlew :core:compileTestJava)",
+      "Bash(./gradlew :core:compileJava)"
     ]
   }
 }

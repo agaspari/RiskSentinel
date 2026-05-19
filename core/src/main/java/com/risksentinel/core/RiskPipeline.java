@@ -130,7 +130,11 @@ public class RiskPipeline {
                 brokerExecutor.shutdownNow();
             }
         }
+        if (paperBroker != null) {
+            paperBroker.shutdown();
+        }
         ingestor.stop();
+        gatewayState.shutdown();
     }
 
     public void submit(Trade trade) {

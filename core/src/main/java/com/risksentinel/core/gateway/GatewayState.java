@@ -1,8 +1,11 @@
 package com.risksentinel.core.gateway;
 
+import com.risksentinel.core.ops.BoundedIdempotencyCache;
+
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -12,19 +15,30 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <ul>
  *   <li>The <strong>kill switch</strong>, a single {@link AtomicBoolean} ops can flip
  *       to halt every proposal regardless of any other check.</li>
- *   <li>The <strong>idempotency record</strong>, a {@link ConcurrentHashMap} of every
- *       {@code proposalId} seen so far. {@link #recordProposalIfAbsent} is an atomic
- *       CAS — concurrent submissions of the same id see exactly one {@code true}.</li>
+ *   <li>The <strong>idempotency record</strong>, a {@link BoundedIdempotencyCache}
+ *       whose {@code recordIfAbsent} is an atomic per-key CAS; concurrent
+ *       submissions of the same id see exactly one {@code true}. Entries are
+ *       evicted by TTL and a hard size cap (Phase 5).</li>
  * </ul>
- *
- * <p><strong>Phase 3 caveat:</strong> {@code seenProposals} grows unbounded.
- * Phase 5 (ops) will add bounded eviction; for now we accept the leak as the
- * cost of strict idempotency.
  */
 public final class GatewayState {
 
+    /** Default retention: 1 hour TTL, 1M entry cap, sweep every minute. */
+    private static final Duration DEFAULT_TTL = Duration.ofHours(1);
+    private static final int DEFAULT_MAX_SIZE = 1_000_000;
+    private static final Duration DEFAULT_SWEEP_INTERVAL = Duration.ofMinutes(1);
+
     private final AtomicBoolean killSwitch = new AtomicBoolean(false);
-    private final ConcurrentHashMap<String, Instant> seenProposals = new ConcurrentHashMap<>();
+    private final BoundedIdempotencyCache seenProposals;
+
+    public GatewayState() {
+        this(new BoundedIdempotencyCache(
+                DEFAULT_TTL, DEFAULT_MAX_SIZE, DEFAULT_SWEEP_INTERVAL, Clock.systemUTC()));
+    }
+
+    public GatewayState(BoundedIdempotencyCache seenProposals) {
+        this.seenProposals = Objects.requireNonNull(seenProposals, "seenProposals");
+    }
 
     public boolean isKillSwitchEngaged() {
         return killSwitch.get();
@@ -45,13 +59,16 @@ public final class GatewayState {
      *         {@code false} if it was already present
      */
     public boolean recordProposalIfAbsent(String proposalId, Instant at) {
-        Objects.requireNonNull(proposalId, "proposalId cannot be null");
-        Objects.requireNonNull(at, "at cannot be null");
-        return seenProposals.putIfAbsent(proposalId, at) == null;
+        return seenProposals.recordIfAbsent(proposalId, at);
     }
 
-    /** Number of distinct proposalIds recorded. Useful for tests and ops. */
+    /** Number of distinct proposalIds currently retained. */
     public int seenProposalCount() {
         return seenProposals.size();
+    }
+
+    /** Releases the cache's background sweeper. */
+    public void shutdown() {
+        seenProposals.shutdown();
     }
 }
