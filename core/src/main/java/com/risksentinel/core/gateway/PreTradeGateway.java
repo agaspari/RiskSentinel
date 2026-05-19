@@ -1,5 +1,8 @@
 package com.risksentinel.core.gateway;
 
+import com.risksentinel.core.audit.AuditLog;
+import com.risksentinel.core.audit.DecisionRecords;
+import com.risksentinel.core.audit.NoopAuditLog;
 import com.risksentinel.core.domain.Instrument;
 import com.risksentinel.core.domain.RiskSnapshot;
 import com.risksentinel.core.domain.TradeProposal;
@@ -48,6 +51,7 @@ public final class PreTradeGateway {
     private final Clock clock;
     private final LatencyRecorder decideLatency;
     private final MetricsRegistry metrics;
+    private final AuditLog auditLog;
 
     public PreTradeGateway(
             RiskSnapshotCache snapshotCache,
@@ -56,7 +60,8 @@ public final class PreTradeGateway {
             GatewayState state,
             Clock clock,
             LatencyRecorder decideLatency,
-            MetricsRegistry metrics) {
+            MetricsRegistry metrics,
+            AuditLog auditLog) {
         this.snapshotCache = Objects.requireNonNull(snapshotCache, "snapshotCache");
         this.instrumentRegistry = Map.copyOf(Objects.requireNonNull(instrumentRegistry, "instrumentRegistry"));
         this.limits = Objects.requireNonNull(limits, "limits");
@@ -64,6 +69,7 @@ public final class PreTradeGateway {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.decideLatency = Objects.requireNonNull(decideLatency, "decideLatency");
         this.metrics = Objects.requireNonNull(metrics, "metrics");
+        this.auditLog = Objects.requireNonNull(auditLog, "auditLog");
         this.checks = List.of(
                 new KillSwitchCheck(),
                 new IdempotencyCheck(),
@@ -79,9 +85,21 @@ public final class PreTradeGateway {
             GatewayLimits limits,
             GatewayState state,
             Clock clock,
+            LatencyRecorder decideLatency,
+            MetricsRegistry metrics) {
+        this(snapshotCache, instrumentRegistry, limits, state, clock,
+                decideLatency, metrics, new NoopAuditLog());
+    }
+
+    public PreTradeGateway(
+            RiskSnapshotCache snapshotCache,
+            Map<String, Instrument> instrumentRegistry,
+            GatewayLimits limits,
+            GatewayState state,
+            Clock clock,
             LatencyRecorder decideLatency) {
         this(snapshotCache, instrumentRegistry, limits, state, clock, decideLatency,
-                new NoopMetricsRegistry());
+                new NoopMetricsRegistry(), new NoopAuditLog());
     }
 
     public PreTradeGateway(
@@ -92,7 +110,8 @@ public final class PreTradeGateway {
             Clock clock) {
         this(snapshotCache, instrumentRegistry, limits, state, clock,
                 LatencyRecorder.noop("gateway-decide-nanos"),
-                new NoopMetricsRegistry());
+                new NoopMetricsRegistry(),
+                new NoopAuditLog());
     }
 
     /** Convenience for tests that don't supply a clock. */
@@ -127,6 +146,12 @@ public final class PreTradeGateway {
                 "snapshotId", proposal.snapshotId())) {
             GatewayDecision decision = decideInternal(proposal);
             recordDecisionMetric(decision);
+            try {
+                auditLog.record(DecisionRecords.fromDecision(decision, proposal));
+            } catch (RuntimeException auditFailure) {
+                log.warn("Audit log record failed for proposalId={}: {}",
+                        proposal.proposalId(), auditFailure.toString());
+            }
             if (log.isDebugEnabled()) {
                 try (MdcScope ignored2 = MdcScope.of("decisionCode",
                         decision instanceof GatewayDecision.Reject r && !r.reasons().isEmpty()

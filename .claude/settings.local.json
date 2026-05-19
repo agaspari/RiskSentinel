@@ -10,7 +10,10 @@
       "Bash(./gradlew :core:test --tests \"com.risksentinel.core.ops.BoundedOrderHistoryTest\")",
       "Bash(./gradlew :core:test --tests \"com.risksentinel.core.ops.LatencyRecorderTest\")",
       "Bash(./gradlew :core:compileTestJava)",
-      "Bash(./gradlew :core:compileJava)"
+      "Bash(./gradlew :core:compileJava)",
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.audit.DecisionRecordTest\")",
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.audit.SqliteAuditLogTest\")",
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.audit.AsyncAuditLogTest\")"
     ]
   }
 }
