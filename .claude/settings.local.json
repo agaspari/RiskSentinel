@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.broker.*\")",
+      "Bash(./gradlew :core:test)",
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.PipelineFillLoopTest\")",
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.RiskPipelineTest\")"
+    ]
+  }
+}
