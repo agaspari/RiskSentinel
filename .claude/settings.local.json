@@ -13,7 +13,13 @@
       "Bash(./gradlew :core:compileJava)",
       "Bash(./gradlew :core:test --tests \"com.risksentinel.core.audit.DecisionRecordTest\")",
       "Bash(./gradlew :core:test --tests \"com.risksentinel.core.audit.SqliteAuditLogTest\")",
-      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.audit.AsyncAuditLogTest\")"
+      "Bash(./gradlew :core:test --tests \"com.risksentinel.core.audit.AsyncAuditLogTest\")",
+      "Bash(./gradlew :mcp-bridge:test)",
+      "Bash(./gradlew :mcp-bridge:test --tests \"com.risksentinel.mcp.tools.ActionToolsTest\")",
+      "Bash(./gradlew :mcp-bridge:compileJava)",
+      "Bash(./gradlew :mcp-bridge:dependencies --configuration runtimeClasspath)",
+      "Bash(./gradlew :mcp-bridge:resolveTaskClasspath -q)",
+      "Bash(./gradlew :mcp-bridge:test --refresh-dependencies)"
     ]
   }
 }
