@@ -129,6 +129,64 @@ class ConcurrentPositionBookTest {
     }
 
     @Nested
+    @DisplayName("Short positions and zero-crossing")
+    class ShortAndCross {
+
+        @Test
+        void shouldOpenShort_whenSellingFromFlat() {
+            book.apply(sell("port-1", "AAPL", 100, 200.0));
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(-100L);
+            assertThat(pos.avgCost()).isEqualTo(200.0);
+        }
+
+        @Test
+        void shouldExtendShort_withWeightedAverage() {
+            book.apply(sell("port-1", "AAPL", 100, 200.0));
+            book.apply(sell("port-1", "AAPL", 50, 220.0));
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(-150L);
+            assertThat(pos.avgCost()).isCloseTo(206.667, within(0.001));
+        }
+
+        @Test
+        void shouldReduceShort_byBuying_preservingAvgCost() {
+            book.apply(sell("port-1", "AAPL", 100, 200.0));
+            book.apply(buy("port-1", "AAPL", 40, 100.0));
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(-60L);
+            assertThat(pos.avgCost()).isEqualTo(200.0);
+        }
+
+        @Test
+        void shouldCrossFromShortToLong_withTradePriceAsAvgCost() {
+            book.apply(sell("port-1", "AAPL", 50, 200.0));
+            book.apply(buy("port-1", "AAPL", 100, 50.0));
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(50L);
+            assertThat(pos.avgCost()).isEqualTo(50.0);
+        }
+
+        @Test
+        void shouldCrossFromLongToShort_withTradePriceAsAvgCost() {
+            book.apply(buy("port-1", "AAPL", 50, 150.0));
+            book.apply(sell("port-1", "AAPL", 100, 200.0));
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(-50L);
+            assertThat(pos.avgCost()).isEqualTo(200.0);
+        }
+
+        @Test
+        void shouldReturnZeroAvgCost_whenSellingEntirePosition() {
+            book.apply(buy("port-1", "AAPL", 100, 150.0));
+            book.apply(sell("port-1", "AAPL", 100, 100.0));
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isZero();
+            assertThat(pos.avgCost()).isZero();
+        }
+    }
+
+    @Nested
     @DisplayName("Portfolio and symbol isolation")
     class Isolation {
 

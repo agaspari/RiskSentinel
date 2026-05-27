@@ -1,7 +1,6 @@
 package com.risksentinel.core.positions;
 
 import com.risksentinel.core.domain.Position;
-import com.risksentinel.core.domain.Side;
 import com.risksentinel.core.domain.Trade;
 
 import java.util.ArrayList;
@@ -45,19 +44,10 @@ public class ConcurrentPositionBook implements PositionBook {
             Map<String, Position> portfolio = positions.get(portfolioId);
             
             Position current = portfolio.getOrDefault(symbol, new Position(portfolioId, symbol, 0, 0.0, 0.0));
-            
-            long newQty;
-            double newAvgCost = current.avgCost();
-            
-            if (trade.side() == Side.BUY) {
-                newQty = current.quantity() + trade.quantity();
-                if (newQty > 0) {
-                    newAvgCost = ((current.quantity() * current.avgCost()) + (trade.quantity() * trade.price())) / newQty;
-                }
-            } else {
-                newQty = current.quantity() - trade.quantity();
-            }
-            
+
+            long newQty = current.quantity() + PositionMath.deltaQuantity(trade);
+            double newAvgCost = PositionMath.newAvgCost(current.quantity(), current.avgCost(), trade, newQty);
+
             portfolio.put(symbol, new Position(portfolioId, symbol, newQty, newAvgCost, 0.0));
         }
     }

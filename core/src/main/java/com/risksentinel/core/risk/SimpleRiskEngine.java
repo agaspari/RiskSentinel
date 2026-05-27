@@ -4,13 +4,24 @@ import com.risksentinel.core.domain.Instrument;
 import com.risksentinel.core.domain.Position;
 import com.risksentinel.core.domain.RiskSnapshot;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 public class SimpleRiskEngine implements RiskEngine {
+
+    private final Clock clock;
+
+    public SimpleRiskEngine() {
+        this(Clock.systemUTC());
+    }
+
+    public SimpleRiskEngine(Clock clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
 
     @Override
     public RiskSnapshot compute(String portfolioId, Collection<Position> positions, Map<String, Instrument> instruments) {
@@ -57,7 +68,7 @@ public class SimpleRiskEngine implements RiskEngine {
                 hhi,
                 0.0, // parametricVaR95 — Phase 5+
                 0.0, // dailyPnL — needs opening snapshot, Phase 5+
-                Instant.now()
+                clock.instant()
         );
     }
 }

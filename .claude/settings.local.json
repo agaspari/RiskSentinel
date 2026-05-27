@@ -23,7 +23,8 @@
       "Bash(./gradlew :core:test --tests \"com.risksentinel.core.audit.CallerTest\" :mcp-bridge:test --tests \"com.risksentinel.mcp.ToolAuthorizerTest\" --console=plain)",
       "Bash(./gradlew test *)",
       "Bash(./gradlew :core:test --console=plain)",
-      "Bash(./gradlew :analyst:test --tests \"com.risksentinel.analyst.eval.TrustBoundaryEvalTest\" --console=plain)"
+      "Bash(./gradlew :analyst:test --tests \"com.risksentinel.analyst.eval.TrustBoundaryEvalTest\" --console=plain)",
+      "Bash(./gradlew :eval:test *)"
     ]
   }
 }

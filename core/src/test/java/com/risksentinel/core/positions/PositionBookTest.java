@@ -123,6 +123,88 @@ class PositionBookTest {
     }
 
     // ──────────────────────────────────────────────
+    // Crossing zero (short ↔ long) and short-side basis
+    // ──────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Short positions and zero-crossing")
+    class ShortAndCross {
+
+        @Test
+        void shouldOpenShort_whenSellingFromFlat() {
+            // Sell 100 @ $200 from a flat position
+            // → Position(qty=-100, avgCost=200.0). The basis of a short is the price
+            //   at which the position was opened.
+            book.apply(sell("port-1", "AAPL", 100, 200.0));
+
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(-100L);
+            assertThat(pos.avgCost()).isEqualTo(200.0);
+        }
+
+        @Test
+        void shouldExtendShort_withWeightedAverage() {
+            // Sell 100 @ $200, then Sell 50 @ $220
+            // → qty=-150, avgCost = (100*200 + 50*220) / 150 ≈ 206.667
+            book.apply(sell("port-1", "AAPL", 100, 200.0));
+            book.apply(sell("port-1", "AAPL", 50, 220.0));
+
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(-150L);
+            assertThat(pos.avgCost()).isCloseTo(206.667, within(0.001));
+        }
+
+        @Test
+        void shouldReduceShort_byBuying_preservingAvgCost() {
+            // Short -100 @ $200, then Buy 40 @ $100 (partial cover)
+            // → qty=-60, avgCost stays at 200.0 (basis preserved on partial close)
+            book.apply(sell("port-1", "AAPL", 100, 200.0));
+            book.apply(buy("port-1", "AAPL", 40, 100.0));
+
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(-60L);
+            assertThat(pos.avgCost()).isEqualTo(200.0);
+        }
+
+        @Test
+        void shouldCrossFromShortToLong_withTradePriceAsAvgCost() {
+            // Short -50 @ $200, then Buy 100 @ $50 (overcover)
+            // → qty=+50; new position is "freshly opened long" so avgCost = $50.
+            // This is the regression case that broke under the old weighted-avg formula.
+            book.apply(sell("port-1", "AAPL", 50, 200.0));
+            book.apply(buy("port-1", "AAPL", 100, 50.0));
+
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(50L);
+            assertThat(pos.avgCost()).isEqualTo(50.0);
+        }
+
+        @Test
+        void shouldCrossFromLongToShort_withTradePriceAsAvgCost() {
+            // Long +50 @ $150, then Sell 100 @ $200 (oversell)
+            // → qty=-50; fresh short at $200.
+            book.apply(buy("port-1", "AAPL", 50, 150.0));
+            book.apply(sell("port-1", "AAPL", 100, 200.0));
+
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isEqualTo(-50L);
+            assertThat(pos.avgCost()).isEqualTo(200.0);
+        }
+
+        @Test
+        void shouldReturnZeroAvgCost_whenSellingEntirePosition() {
+            // Long 100 @ $150, Sell 100 @ anything → qty=0, avgCost=0
+            // A closed position has no basis.
+            book.apply(buy("port-1", "AAPL", 100, 150.0));
+            book.apply(sell("port-1", "AAPL", 100, 100.0));
+
+            Position pos = book.getPosition("port-1", "AAPL").orElseThrow();
+            assertThat(pos.quantity()).isZero();
+            assertThat(pos.avgCost()).isZero();
+        }
+    }
+
+    // ──────────────────────────────────────────────
     // Isolation
     // ──────────────────────────────────────────────
 
