@@ -1,6 +1,7 @@
 package com.risksentinel.core.gateway;
 
 import com.risksentinel.core.audit.AuditLog;
+import com.risksentinel.core.audit.Caller;
 import com.risksentinel.core.audit.DecisionRecords;
 import com.risksentinel.core.audit.NoopAuditLog;
 import com.risksentinel.core.domain.Instrument;
@@ -135,10 +136,22 @@ public final class PreTradeGateway {
 
     /**
      * Evaluate the proposal against every configured check. Always returns a
-     * non-null {@link GatewayDecision}. Never throws.
+     * non-null {@link GatewayDecision}. Never throws. Equivalent to
+     * {@code decide(proposal, Caller.system())} — callers that already know
+     * an identity (the MCP bridge, the analyst bridge) should pass it via
+     * the overload.
      */
     public GatewayDecision decide(TradeProposal proposal) {
+        return decide(proposal, Caller.system());
+    }
+
+    /**
+     * As {@link #decide(TradeProposal)}, but records the {@link Caller}
+     * responsible for the proposal in the audit log.
+     */
+    public GatewayDecision decide(TradeProposal proposal, Caller caller) {
         Objects.requireNonNull(proposal, "proposal cannot be null");
+        Objects.requireNonNull(caller, "caller cannot be null");
         long startNanos = System.nanoTime();
         try (MdcScope ignored = MdcScope.of(
                 "portfolioId", proposal.portfolioId(),
@@ -147,7 +160,7 @@ public final class PreTradeGateway {
             GatewayDecision decision = decideInternal(proposal);
             recordDecisionMetric(decision);
             try {
-                auditLog.record(DecisionRecords.fromDecision(decision, proposal));
+                auditLog.record(DecisionRecords.fromDecision(decision, proposal, caller));
             } catch (RuntimeException auditFailure) {
                 log.warn("Audit log record failed for proposalId={}: {}",
                         proposal.proposalId(), auditFailure.toString());

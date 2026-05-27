@@ -5,8 +5,10 @@ import com.risksentinel.core.domain.Side;
 import com.risksentinel.core.domain.TradeProposal;
 import com.risksentinel.core.gateway.GatewayDecision;
 import com.risksentinel.core.gateway.PreTradeGateway;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.Json;
 import com.risksentinel.mcp.Tool;
+import com.risksentinel.mcp.ToolPermission;
 import com.risksentinel.mcp.ToolResult;
 import com.risksentinel.mcp.ToolSchemas;
 
@@ -36,6 +38,8 @@ public final class SubmitProposalTool implements Tool {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
+    @Override public ToolPermission permission() { return ToolPermission.WRITE; }
+
     @Override public String name() { return "submit_proposal"; }
 
     @Override public String description() {
@@ -61,7 +65,7 @@ public final class SubmitProposalTool implements Tool {
                 props);
     }
 
-    @Override public ToolResult invoke(JsonNode input) {
+    @Override public ToolResult invoke(JsonNode input, InvocationContext context) {
         TradeProposal proposal;
         try {
             String sideStr = input.path("side").asText();
@@ -84,7 +88,7 @@ public final class SubmitProposalTool implements Tool {
             return ToolResult.error("Invalid proposal: " + e.getMessage());
         }
 
-        GatewayDecision decision = gateway.decide(proposal);
+        GatewayDecision decision = gateway.decide(proposal, context.caller());
         return ToolResult.ok(Json.writeOrError(envelope(decision)));
     }
 

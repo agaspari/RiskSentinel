@@ -17,6 +17,13 @@ public final class DecisionRecords {
     private DecisionRecords() {}
 
     public static DecisionRecord fromDecision(GatewayDecision decision, TradeProposal proposal) {
+        return fromDecision(decision, proposal, null);
+    }
+
+    public static DecisionRecord fromDecision(
+            GatewayDecision decision, TradeProposal proposal, Caller caller) {
+        Caller.CallerKind kind = caller == null ? null : caller.kind();
+        String id = caller == null ? null : caller.id();
         if (decision instanceof GatewayDecision.Accept accept) {
             return new DecisionRecord(
                     proposal.proposalId(),
@@ -29,7 +36,8 @@ public final class DecisionRecords {
                     DecisionType.ACCEPT,
                     null,
                     "[]",
-                    accept.decidedAt());
+                    accept.decidedAt(),
+                    kind, id);
         }
         if (decision instanceof GatewayDecision.Reject reject) {
             List<RejectReason> reasons = reject.reasons();
@@ -47,7 +55,8 @@ public final class DecisionRecords {
                     DecisionType.REJECT,
                     firstCode,
                     encodeReasons(reasons),
-                    reject.decidedAt());
+                    reject.decidedAt(),
+                    kind, id);
         }
         throw new IllegalStateException("Unknown GatewayDecision subtype: " + decision.getClass());
     }

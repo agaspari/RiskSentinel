@@ -2,7 +2,9 @@ package com.risksentinel.mcp.tools;
 
 import tools.jackson.databind.JsonNode;
 import com.risksentinel.core.gateway.GatewayState;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.Tool;
+import com.risksentinel.mcp.ToolPermission;
 import com.risksentinel.mcp.ToolResult;
 import com.risksentinel.mcp.ToolSchemas;
 
@@ -19,6 +21,8 @@ public final class EngageKillSwitchTool implements Tool {
         this.state = Objects.requireNonNull(state, "state");
     }
 
+    @Override public ToolPermission permission() { return ToolPermission.ADMIN; }
+
     @Override public String name() { return "engage_kill_switch"; }
 
     @Override public String description() {
@@ -30,7 +34,7 @@ public final class EngageKillSwitchTool implements Tool {
         return ToolSchemas.object(List.of(), Map.of());
     }
 
-    @Override public ToolResult invoke(JsonNode input) {
+    @Override public ToolResult invoke(JsonNode input, InvocationContext context) {
         state.engageKillSwitch();
         return ToolResult.ok("{\"engaged\":true}");
     }

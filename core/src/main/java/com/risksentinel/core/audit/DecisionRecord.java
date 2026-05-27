@@ -10,7 +10,12 @@ import java.util.Objects;
  *
  * <p>Captures everything needed to reconstruct the decision after the fact:
  * the proposal context, the outcome, the first rejection code (for quick
- * indexing), and the full reasons list as JSON.
+ * indexing), the full reasons list as JSON, and the {@link Caller} that
+ * initiated the proposal.
+ *
+ * <p>{@code callerKind} and {@code callerId} are nullable for backwards
+ * compatibility with v1 audit records written before the schema migration.
+ * New records always populate both.
  */
 public record DecisionRecord(
         String proposalId,
@@ -23,7 +28,9 @@ public record DecisionRecord(
         DecisionType type,
         String firstRejectCode,
         String reasonsJson,
-        Instant decidedAt
+        Instant decidedAt,
+        Caller.CallerKind callerKind,
+        String callerId
 ) {
     public DecisionRecord {
         Objects.requireNonNull(proposalId, "proposalId");
@@ -56,5 +63,24 @@ public record DecisionRecord(
         if (type == DecisionType.REJECT && firstRejectCode == null) {
             throw new IllegalArgumentException("REJECT records must include a firstRejectCode");
         }
+        // Caller fields are an all-or-nothing pair when present.
+        if ((callerKind == null) != (callerId == null)) {
+            throw new IllegalArgumentException(
+                    "callerKind and callerId must both be set or both be null");
+        }
+        if (callerId != null && callerId.isBlank()) {
+            throw new IllegalArgumentException("callerId cannot be blank when set");
+        }
+    }
+
+    /** Legacy constructor — pre-v2 records had no caller fields. */
+    public DecisionRecord(
+            String proposalId, String portfolioId, String symbol, Side side,
+            long quantity, double limitPrice, String snapshotId,
+            DecisionType type, String firstRejectCode, String reasonsJson,
+            Instant decidedAt) {
+        this(proposalId, portfolioId, symbol, side, quantity, limitPrice,
+                snapshotId, type, firstRejectCode, reasonsJson, decidedAt,
+                null, null);
     }
 }

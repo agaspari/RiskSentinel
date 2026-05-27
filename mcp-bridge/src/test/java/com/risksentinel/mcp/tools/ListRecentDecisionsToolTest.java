@@ -6,6 +6,7 @@ import com.risksentinel.core.audit.DecisionRecord;
 import com.risksentinel.core.audit.DecisionType;
 import com.risksentinel.core.audit.SqliteAuditLog;
 import com.risksentinel.core.domain.Side;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.ToolResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -30,7 +31,7 @@ class ListRecentDecisionsToolTest {
             ListRecentDecisionsTool tool = new ListRecentDecisionsTool(log);
 
             ToolResult r = tool.invoke(BridgeFixtures.parse(
-                    "{\"portfolioId\":\"port-1\",\"limit\":10}"));
+                    "{\"portfolioId\":\"port-1\",\"limit\":10}"), InvocationContext.forSystem());
 
             assertThat(r.isError()).isFalse();
             assertThat(r.content()).isEqualTo("[]");
@@ -48,7 +49,7 @@ class ListRecentDecisionsToolTest {
 
             ListRecentDecisionsTool tool = new ListRecentDecisionsTool(log);
             ToolResult r = tool.invoke(BridgeFixtures.parse(
-                    "{\"portfolioId\":\"port-1\",\"limit\":10}"));
+                    "{\"portfolioId\":\"port-1\",\"limit\":10}"), InvocationContext.forSystem());
 
             assertThat(r.isError()).isFalse();
             JsonNode arr = BridgeFixtures.parse(r.content());
@@ -63,7 +64,7 @@ class ListRecentDecisionsToolTest {
         try (AuditLog log = new SqliteAuditLog(dir.resolve("audit.db"))) {
             ListRecentDecisionsTool tool = new ListRecentDecisionsTool(log);
             ToolResult r = tool.invoke(BridgeFixtures.parse(
-                    "{\"portfolioId\":\"port-1\",\"limit\":0}"));
+                    "{\"portfolioId\":\"port-1\",\"limit\":0}"), InvocationContext.forSystem());
 
             assertThat(r.isError()).isTrue();
             assertThat(r.content()).contains("limit");

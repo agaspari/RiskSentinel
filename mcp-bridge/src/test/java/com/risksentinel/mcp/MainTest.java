@@ -46,4 +46,19 @@ class MainTest {
                         "engage_kill_switch",
                         "disengage_kill_switch");
     }
+
+    @Test
+    void helpFlagShouldExitCleanly_andMentionOperatorFlag() throws Exception {
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        PrintStream original = System.out;
+        try {
+            System.setOut(new PrintStream(captured, true));
+            Main.main(new String[]{"--help"});
+        } finally {
+            System.setOut(original);
+        }
+        String output = captured.toString();
+        assertThat(output).contains("--operator");
+        assertThat(output).contains("ADMIN");
+    }
 }

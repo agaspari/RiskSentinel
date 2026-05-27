@@ -3,8 +3,10 @@ package com.risksentinel.mcp.tools;
 import tools.jackson.databind.JsonNode;
 import com.risksentinel.core.domain.Position;
 import com.risksentinel.core.positions.PositionBook;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.Json;
 import com.risksentinel.mcp.Tool;
+import com.risksentinel.mcp.ToolPermission;
 import com.risksentinel.mcp.ToolResult;
 import com.risksentinel.mcp.ToolSchemas;
 
@@ -22,6 +24,8 @@ public final class ListPositionsTool implements Tool {
         this.positionBook = Objects.requireNonNull(positionBook, "positionBook");
     }
 
+    @Override public ToolPermission permission() { return ToolPermission.READ_ONLY; }
+
     @Override public String name() { return "list_positions"; }
 
     @Override public String description() {
@@ -34,7 +38,7 @@ public final class ListPositionsTool implements Tool {
                 Map.of("portfolioId", ToolSchemas.field("string", "Portfolio identifier")));
     }
 
-    @Override public ToolResult invoke(JsonNode input) {
+    @Override public ToolResult invoke(JsonNode input, InvocationContext context) {
         String portfolioId = input.path("portfolioId").asText();
         Collection<Position> positions = positionBook.getPositions(portfolioId);
         return ToolResult.ok(Json.writeOrError(positions));

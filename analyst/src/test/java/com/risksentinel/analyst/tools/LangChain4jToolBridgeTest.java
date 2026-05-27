@@ -1,6 +1,9 @@
 package com.risksentinel.analyst.tools;
 
+import com.risksentinel.core.audit.Caller;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.Tool;
+import com.risksentinel.mcp.ToolPermission;
 import com.risksentinel.mcp.ToolRegistry;
 import com.risksentinel.mcp.ToolResult;
 import com.risksentinel.mcp.ToolSchemas;
@@ -39,7 +42,7 @@ class LangChain4jToolBridgeTest {
         @Override public String name() { return name; }
         @Override public String description() { return "stub " + name; }
         @Override public Map<String, Object> inputSchema() { return schema; }
-        @Override public ToolResult invoke(JsonNode input) { return handler.apply(input); }
+        @Override public ToolResult invoke(JsonNode input, InvocationContext context) { return handler.apply(input); }
     }
 
     private static ToolRegistry registryOf(Tool... tools) {
@@ -61,7 +64,7 @@ class LangChain4jToolBridgeTest {
                         Map.of("limit", ToolSchemas.field("integer", "row cap"))),
                 in -> ToolResult.ok("{}"));
 
-        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(a, b), JSON);
+        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(a, b), Caller.system(), JSON);
 
         List<ToolSpecification> specs = bridge.specifications();
 
@@ -88,7 +91,7 @@ class LangChain4jToolBridgeTest {
                 ToolSchemas.object(List.of(), Map.of()),
                 in -> ToolResult.ok("{}"));
 
-        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), JSON);
+        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), Caller.system(), JSON);
 
         List<ToolSpecification> specs = bridge.specifications();
 
@@ -105,7 +108,7 @@ class LangChain4jToolBridgeTest {
                 ToolSchemas.object(List.of(), Map.of()),
                 in -> ToolResult.ok("{\"got\":\"" + in.toString() + "\"}"));
 
-        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), JSON);
+        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), Caller.system(), JSON);
 
         ToolExecutionRequest req = ToolExecutionRequest.builder()
                 .id("req-1")
@@ -128,7 +131,7 @@ class LangChain4jToolBridgeTest {
                 ToolSchemas.object(List.of(), Map.of()),
                 in -> ToolResult.ok("{\"ok\":true,\"empty\":" + in.isEmpty() + "}"));
 
-        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), JSON);
+        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), Caller.system(), JSON);
 
         ToolExecutionResultMessage result = bridge.execute(
                 ToolExecutionRequest.builder().id("r").name("ping").arguments("").build());
@@ -143,7 +146,7 @@ class LangChain4jToolBridgeTest {
                 ToolSchemas.object(List.of(), Map.of()),
                 in -> { throw new RuntimeException("blew up"); });
 
-        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), JSON);
+        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), Caller.system(), JSON);
 
         ToolExecutionResultMessage result = bridge.execute(
                 ToolExecutionRequest.builder().id("r").name("boom").arguments("{}").build());
@@ -159,7 +162,7 @@ class LangChain4jToolBridgeTest {
                 ToolSchemas.object(List.of(), Map.of()),
                 in -> ToolResult.ok("{\"ok\":true}"));
 
-        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), JSON);
+        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), Caller.system(), JSON);
 
         ToolExecutionResultMessage result = bridge.execute(
                 ToolExecutionRequest.builder().id("r").name("echo").arguments("not json").build());
@@ -170,13 +173,41 @@ class LangChain4jToolBridgeTest {
 
     @Test
     void shouldReturnErrorResult_forUnknownTool() {
-        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(), JSON);
+        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(), Caller.system(), JSON);
 
         ToolExecutionResultMessage result = bridge.execute(
                 ToolExecutionRequest.builder().id("r").name("nope").arguments("{}").build());
 
         assertThat(result.text()).contains("error");
         assertThat(result.text()).contains("nope");
+    }
+
+    @Test
+    void shouldPropagateCaller_toRegistry() {
+        // ADMIN tool: agent caller is denied, operator caller is allowed.
+        // The bridge is the only thing supplying the caller, so divergent
+        // outcomes here mean the caller field is actually being threaded
+        // through to ToolRegistry.invoke.
+        Tool adminTool = new Tool() {
+            @Override public String name() { return "admin_op"; }
+            @Override public String description() { return "admin only"; }
+            @Override public Map<String, Object> inputSchema() {
+                return ToolSchemas.object(List.of(), Map.of());
+            }
+            @Override public ToolPermission permission() { return ToolPermission.ADMIN; }
+            @Override public ToolResult invoke(JsonNode input, InvocationContext context) { return ToolResult.ok("{\"ran\":true}"); }
+        };
+        ToolRegistry registry = new ToolRegistry(List.of(adminTool));
+        ToolExecutionRequest req = ToolExecutionRequest.builder()
+                .id("r").name("admin_op").arguments("{}").build();
+
+        ToolExecutionResultMessage agentResult =
+                new LangChain4jToolBridge(registry, Caller.agent("a"), JSON).execute(req);
+        ToolExecutionResultMessage operatorResult =
+                new LangChain4jToolBridge(registry, Caller.operator("alice"), JSON).execute(req);
+
+        assertThat(agentResult.text()).contains("Permission denied");
+        assertThat(operatorResult.text()).contains("\"ran\":true");
     }
 
     @Test
@@ -188,7 +219,7 @@ class LangChain4jToolBridgeTest {
                         Map.of("portfolioId", ToolSchemas.field("string", "id"))),
                 in -> ToolResult.ok("{\"ok\":true}"));
 
-        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), JSON);
+        LangChain4jToolBridge bridge = new LangChain4jToolBridge(registryOf(tool), Caller.system(), JSON);
 
         ToolExecutionResultMessage result = bridge.execute(
                 ToolExecutionRequest.builder().id("r").name("needs_id").arguments("{}").build());

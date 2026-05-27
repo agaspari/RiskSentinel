@@ -5,6 +5,7 @@ import com.risksentinel.core.gateway.GatewayLimits;
 import com.risksentinel.core.gateway.GatewayState;
 import com.risksentinel.core.gateway.PreTradeGateway;
 import com.risksentinel.core.risk.ConcurrentRiskSnapshotCache;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.ToolResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,7 +64,7 @@ class ActionToolsTest {
 
     @Test
     void shouldAcceptValidProposal() {
-        ToolResult r = submitTool.invoke(validProposal());
+        ToolResult r = submitTool.invoke(validProposal(), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         JsonNode body = BridgeFixtures.parse(r.content());
@@ -84,7 +85,7 @@ class ActionToolsTest {
         fields.put("snapshotId", "snap-x");
         JsonNode input = BridgeFixtures.parseInput(fields);
 
-        ToolResult r = submitTool.invoke(input);
+        ToolResult r = submitTool.invoke(input, InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         assertThat(r.content()).contains("FAT_FINGER_QUANTITY");
@@ -101,7 +102,7 @@ class ActionToolsTest {
         fields.put("limitPrice", 150.0);
         fields.put("snapshotId", "snap-x");
 
-        ToolResult r = submitTool.invoke(BridgeFixtures.parseInput(fields));
+        ToolResult r = submitTool.invoke(BridgeFixtures.parseInput(fields), InvocationContext.forSystem());
 
         assertThat(r.isError()).isTrue();
         assertThat(r.content()).contains("Invalid");
@@ -109,7 +110,7 @@ class ActionToolsTest {
 
     @Test
     void engageKillSwitch_shouldFlipState() {
-        ToolResult r = engageTool.invoke(BridgeFixtures.parse("{}"));
+        ToolResult r = engageTool.invoke(BridgeFixtures.parse("{}"), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         assertThat(r.content()).contains("\"engaged\":true");
@@ -120,7 +121,7 @@ class ActionToolsTest {
     void disengageKillSwitch_shouldFlipState() {
         state.engageKillSwitch();
 
-        ToolResult r = disengageTool.invoke(BridgeFixtures.parse("{}"));
+        ToolResult r = disengageTool.invoke(BridgeFixtures.parse("{}"), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         assertThat(r.content()).contains("\"engaged\":false");
@@ -134,9 +135,9 @@ class ActionToolsTest {
      */
     @Test
     void shouldRejectAllProposals_whenKillSwitchEngagedViaTool() {
-        engageTool.invoke(BridgeFixtures.parse("{}"));
+        engageTool.invoke(BridgeFixtures.parse("{}"), InvocationContext.forSystem());
 
-        ToolResult r = submitTool.invoke(validProposal());
+        ToolResult r = submitTool.invoke(validProposal(), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         assertThat(r.content()).contains("KILL_SWITCH_ENGAGED");
@@ -149,7 +150,7 @@ class ActionToolsTest {
      */
     @Test
     void shouldNotBypassGateway_evenWithUnknownAdminLikeField() {
-        engageTool.invoke(BridgeFixtures.parse("{}"));
+        engageTool.invoke(BridgeFixtures.parse("{}"), InvocationContext.forSystem());
 
         LinkedHashMap<String, Object> fields = new LinkedHashMap<>();
         fields.put("proposalId", UUID.randomUUID().toString());
@@ -163,7 +164,7 @@ class ActionToolsTest {
         fields.put("force", true);
         fields.put("skipChecks", true);
 
-        ToolResult r = submitTool.invoke(BridgeFixtures.parseInput(fields));
+        ToolResult r = submitTool.invoke(BridgeFixtures.parseInput(fields), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         assertThat(r.content()).contains("KILL_SWITCH_ENGAGED");

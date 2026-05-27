@@ -1,6 +1,7 @@
 package com.risksentinel.mcp;
 
 import com.risksentinel.core.audit.AsyncAuditLog;
+import com.risksentinel.core.audit.Caller;
 import com.risksentinel.core.audit.SqliteAuditLog;
 import com.risksentinel.core.broker.InstantFillModel;
 import com.risksentinel.core.broker.PaperBroker;
@@ -52,7 +53,26 @@ public final class Main {
     private Main() {}
 
     public static void main(String[] args) throws Exception {
-        boolean checkOnly = args.length > 0 && "--check".equals(args[0]);
+        boolean checkOnly = false;
+        Caller caller = Caller.agent("mcp-client");
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+            if ("--check".equals(arg)) {
+                checkOnly = true;
+            } else if ("--operator".equals(arg)) {
+                if (i + 1 >= args.length || args[i + 1].isBlank()) {
+                    System.err.println("Usage: --operator <id>");
+                    System.exit(2);
+                }
+                caller = Caller.operator(args[++i]);
+            } else if ("--help".equals(arg) || "-h".equals(arg)) {
+                System.out.println("Usage: risksentinel [--check] [--operator <id>]");
+                System.out.println("  --check         List registered tools and exit.");
+                System.out.println("  --operator <id> Run with OPERATOR identity (grants ADMIN tools).");
+                System.out.println("                  Default: AGENT identity (READ_ONLY + WRITE only).");
+                return;
+            }
+        }
 
         ToolRegistry registry = buildRegistry(checkOnly);
 
@@ -64,7 +84,8 @@ public final class Main {
             return;
         }
 
-        McpSyncServer server = new McpServerAdapter(registry).build();
+        log.info("Starting MCP bridge as caller kind={} id={}", caller.kind(), caller.id());
+        McpSyncServer server = new McpServerAdapter(registry, caller).build();
         log.info("RiskSentinel MCP bridge started on stdio");
         // stdio transport runs on its own reader thread; park main until the JVM is interrupted.
         Thread.currentThread().join();

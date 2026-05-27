@@ -3,6 +3,7 @@ package com.risksentinel.mcp.tools;
 import tools.jackson.databind.JsonNode;
 import com.risksentinel.core.domain.Side;
 import com.risksentinel.core.risk.ConcurrentRiskSnapshotCache;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.ToolResult;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,7 @@ class GetSnapshotToolTest {
     void shouldReturnNullSnapshot_whenPortfolioHasNoSnapshot() {
         GetSnapshotTool tool = new GetSnapshotTool(new ConcurrentRiskSnapshotCache());
 
-        ToolResult r = tool.invoke(BridgeFixtures.parse("{\"portfolioId\":\"port-empty\"}"));
+        ToolResult r = tool.invoke(BridgeFixtures.parse("{\"portfolioId\":\"port-empty\"}"), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         assertThat(r.content()).contains("\"snapshot\":null");
@@ -28,7 +29,7 @@ class GetSnapshotToolTest {
 
         GetSnapshotTool tool = new GetSnapshotTool(sut.snapshotCache());
 
-        ToolResult r = tool.invoke(BridgeFixtures.parse("{\"portfolioId\":\"port-1\"}"));
+        ToolResult r = tool.invoke(BridgeFixtures.parse("{\"portfolioId\":\"port-1\"}"), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         JsonNode body = BridgeFixtures.parse(r.content());

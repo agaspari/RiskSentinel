@@ -3,6 +3,8 @@ package com.risksentinel.analyst;
 import com.risksentinel.analyst.AnalystResponse.Outcome;
 import com.risksentinel.analyst.support.StubChatModel;
 import com.risksentinel.analyst.tools.LangChain4jToolBridge;
+import com.risksentinel.core.audit.Caller;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.Tool;
 import com.risksentinel.mcp.ToolRegistry;
 import com.risksentinel.mcp.ToolResult;
@@ -38,7 +40,7 @@ class LangChain4jAnalystTest {
     }
 
     private static LangChain4jToolBridge bridgeWith(Tool... tools) {
-        return new LangChain4jToolBridge(new ToolRegistry(List.of(tools)), JSON);
+        return new LangChain4jToolBridge(new ToolRegistry(List.of(tools)), Caller.system(), JSON);
     }
 
     private static Tool stubTool(String name, java.util.function.Function<JsonNode, ToolResult> handler) {
@@ -48,7 +50,7 @@ class LangChain4jAnalystTest {
             @Override public Map<String, Object> inputSchema() {
                 return ToolSchemas.object(List.of(), Map.of());
             }
-            @Override public ToolResult invoke(JsonNode input) { return handler.apply(input); }
+            @Override public ToolResult invoke(JsonNode input, InvocationContext context) { return handler.apply(input); }
         };
     }
 

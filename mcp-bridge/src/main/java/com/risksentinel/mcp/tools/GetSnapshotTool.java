@@ -3,8 +3,10 @@ package com.risksentinel.mcp.tools;
 import tools.jackson.databind.JsonNode;
 import com.risksentinel.core.domain.RiskSnapshot;
 import com.risksentinel.core.risk.RiskSnapshotCache;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.Json;
 import com.risksentinel.mcp.Tool;
+import com.risksentinel.mcp.ToolPermission;
 import com.risksentinel.mcp.ToolResult;
 import com.risksentinel.mcp.ToolSchemas;
 
@@ -26,6 +28,8 @@ public final class GetSnapshotTool implements Tool {
         this.cache = Objects.requireNonNull(cache, "cache");
     }
 
+    @Override public ToolPermission permission() { return ToolPermission.READ_ONLY; }
+
     @Override public String name() { return "get_snapshot"; }
 
     @Override public String description() {
@@ -40,7 +44,7 @@ public final class GetSnapshotTool implements Tool {
                 Map.of("portfolioId", ToolSchemas.field("string", "Portfolio identifier")));
     }
 
-    @Override public ToolResult invoke(JsonNode input) {
+    @Override public ToolResult invoke(JsonNode input, InvocationContext context) {
         String portfolioId = input.path("portfolioId").asText();
         Optional<RiskSnapshot> snap = cache.getSnapshot(portfolioId);
         if (snap.isEmpty()) {

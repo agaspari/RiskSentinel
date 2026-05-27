@@ -1,5 +1,6 @@
 package com.risksentinel.mcp;
 
+import com.risksentinel.core.audit.Caller;
 import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapperSupplier;
 import io.modelcontextprotocol.server.McpServer;
@@ -29,11 +30,13 @@ import tools.jackson.databind.ObjectMapper;
 public final class McpServerAdapter {
 
     private final ToolRegistry registry;
+    private final Caller caller;
     private final McpJsonMapper mcpJsonMapper;
     private final ObjectMapper jsonMapper;
 
-    public McpServerAdapter(ToolRegistry registry) {
+    public McpServerAdapter(ToolRegistry registry, Caller caller) {
         this.registry = Objects.requireNonNull(registry, "registry");
+        this.caller = Objects.requireNonNull(caller, "caller");
         this.mcpJsonMapper = new JacksonMcpJsonMapperSupplier().get();
         this.jsonMapper = Json.MAPPER;
     }
@@ -78,7 +81,7 @@ public final class McpServerAdapter {
         Map<String, Object> args = request.arguments();
         JsonNode input = jsonMapper.valueToTree(args == null ? Map.of() : args);
 
-        ToolResult result = registry.invoke(toolName, input);
+        ToolResult result = registry.invoke(toolName, input, caller);
 
         return McpSchema.CallToolResult.builder()
                 .addTextContent(result.content())

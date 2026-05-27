@@ -3,6 +3,7 @@ package com.risksentinel.mcp.tools;
 import tools.jackson.databind.JsonNode;
 import com.risksentinel.core.domain.Side;
 import com.risksentinel.core.positions.ConcurrentPositionBook;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.ToolResult;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,7 @@ class ListPositionsToolTest {
     void shouldReturnEmptyArray_whenPortfolioFlat() {
         ListPositionsTool tool = new ListPositionsTool(new ConcurrentPositionBook());
 
-        ToolResult r = tool.invoke(BridgeFixtures.parse("{\"portfolioId\":\"port-empty\"}"));
+        ToolResult r = tool.invoke(BridgeFixtures.parse("{\"portfolioId\":\"port-empty\"}"), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         assertThat(r.content()).isEqualTo("[]");
@@ -29,7 +30,7 @@ class ListPositionsToolTest {
 
         ListPositionsTool tool = new ListPositionsTool(sut.positionBook());
 
-        ToolResult r = tool.invoke(BridgeFixtures.parse("{\"portfolioId\":\"port-1\"}"));
+        ToolResult r = tool.invoke(BridgeFixtures.parse("{\"portfolioId\":\"port-1\"}"), InvocationContext.forSystem());
 
         assertThat(r.isError()).isFalse();
         JsonNode arr = BridgeFixtures.parse(r.content());

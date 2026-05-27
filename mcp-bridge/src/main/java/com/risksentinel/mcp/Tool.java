@@ -27,6 +27,21 @@ public interface Tool {
      */
     Map<String, Object> inputSchema();
 
-    /** Pure invocation. Inputs have already passed shallow schema validation. */
-    ToolResult invoke(JsonNode input);
+    /**
+     * Invoke the tool. Inputs have already passed shallow schema validation
+     * and ACL checks; the {@code context} carries per-call metadata (caller
+     * identity, timing) that some tools need to record alongside their effect.
+     * Most tools can ignore the context entirely.
+     */
+    ToolResult invoke(JsonNode input, InvocationContext context);
+
+    /**
+     * Permission level required to invoke this tool. Defaults to
+     * {@link ToolPermission#WRITE} — the safe middle ground. New tool authors
+     * should override deliberately: {@code READ_ONLY} for pure reads,
+     * {@code ADMIN} for operator-only controls.
+     */
+    default ToolPermission permission() {
+        return ToolPermission.WRITE;
+    }
 }

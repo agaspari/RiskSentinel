@@ -1,5 +1,6 @@
 package com.risksentinel.mcp;
 
+import com.risksentinel.core.audit.Caller;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class ToolRegistryTest {
         @Override public String name() { return name; }
         @Override public String description() { return "echo " + name; }
         @Override public Map<String, Object> inputSchema() { return schema; }
-        @Override public ToolResult invoke(JsonNode input) {
+        @Override public ToolResult invoke(JsonNode input, InvocationContext context) {
             return ToolResult.ok(input.toString());
         }
     }
@@ -63,7 +64,7 @@ class ToolRegistryTest {
         ToolRegistry r = new ToolRegistry(List.of(
                 new EchoTool("echo", ToolSchemas.object(List.of(), Map.of()))));
 
-        ToolResult result = r.invoke("echo", parse("{\"x\":1}"));
+        ToolResult result = r.invoke("echo", parse("{\"x\":1}"), Caller.system());
 
         assertThat(result.isError()).isFalse();
         assertThat(result.content()).contains("\"x\":1");
@@ -74,7 +75,7 @@ class ToolRegistryTest {
         ToolRegistry r = new ToolRegistry(List.of(
                 new EchoTool("echo", ToolSchemas.object(List.of(), Map.of()))));
 
-        ToolResult result = r.invoke("nope", parse("{}"));
+        ToolResult result = r.invoke("nope", parse("{}"), Caller.system());
 
         assertThat(result.isError()).isTrue();
         assertThat(result.content()).contains("Unknown tool");
@@ -88,7 +89,7 @@ class ToolRegistryTest {
                 Map.of("portfolioId", ToolSchemas.field("string", "id")));
         ToolRegistry r = new ToolRegistry(List.of(new EchoTool("t", schema)));
 
-        ToolResult result = r.invoke("t", parse("{}"));
+        ToolResult result = r.invoke("t", parse("{}"), Caller.system());
 
         assertThat(result.isError()).isTrue();
         assertThat(result.content()).contains("portfolioId");
@@ -101,7 +102,7 @@ class ToolRegistryTest {
                 Map.of("count", ToolSchemas.field("integer", "n")));
         ToolRegistry r = new ToolRegistry(List.of(new EchoTool("t", schema)));
 
-        ToolResult result = r.invoke("t", parse("{\"count\":\"not-an-integer\"}"));
+        ToolResult result = r.invoke("t", parse("{\"count\":\"not-an-integer\"}"), Caller.system());
 
         assertThat(result.isError()).isTrue();
         assertThat(result.content()).contains("integer");
@@ -114,7 +115,7 @@ class ToolRegistryTest {
                 Map.of("portfolioId", ToolSchemas.field("string", "id")));
         ToolRegistry r = new ToolRegistry(List.of(new EchoTool("t", schema)));
 
-        ToolResult result = r.invoke("t", parse("{\"portfolioId\":\"port-1\"}"));
+        ToolResult result = r.invoke("t", parse("{\"portfolioId\":\"port-1\"}"), Caller.system());
 
         assertThat(result.isError()).isFalse();
         assertThat(result.content()).contains("port-1");
@@ -128,13 +129,13 @@ class ToolRegistryTest {
             @Override public Map<String, Object> inputSchema() {
                 return ToolSchemas.object(List.of(), Map.of());
             }
-            @Override public ToolResult invoke(JsonNode input) {
+            @Override public ToolResult invoke(JsonNode input, InvocationContext context) {
                 throw new IllegalStateException("internal failure");
             }
         };
         ToolRegistry r = new ToolRegistry(List.of(throwing));
 
-        ToolResult result = r.invoke("boom", parse("{}"));
+        ToolResult result = r.invoke("boom", parse("{}"), Caller.system());
 
         assertThat(result.isError()).isTrue();
         assertThat(result.content()).contains("boom");
@@ -146,7 +147,7 @@ class ToolRegistryTest {
         Map<String, Object> schema = ToolSchemas.object(List.of(), Map.of());
         ToolRegistry r = new ToolRegistry(List.of(new EchoTool("t", schema)));
 
-        ToolResult result = r.invoke("t", null);
+        ToolResult result = r.invoke("t", null, Caller.system());
 
         assertThat(result.isError()).isFalse();
     }

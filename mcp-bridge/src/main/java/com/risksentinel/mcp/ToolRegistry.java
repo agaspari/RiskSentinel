@@ -1,10 +1,12 @@
 package com.risksentinel.mcp;
 
+import com.risksentinel.core.audit.Caller;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -25,9 +27,15 @@ public final class ToolRegistry {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final Map<String, Tool> tools;
+    private final ToolAuthorizer authorizer;
 
     public ToolRegistry(List<Tool> tools) {
+        this(tools, ToolAuthorizer.defaults());
+    }
+
+    public ToolRegistry(List<Tool> tools, ToolAuthorizer authorizer) {
         Objects.requireNonNull(tools, "tools");
+        this.authorizer = Objects.requireNonNull(authorizer, "authorizer");
         LinkedHashMap<String, Tool> byName = new LinkedHashMap<>(tools.size());
         for (Tool t : tools) {
             Objects.requireNonNull(t, "tool");
@@ -48,17 +56,32 @@ public final class ToolRegistry {
     }
 
     /**
-     * Invoke {@code toolName} with the provided JSON. Performs shallow schema
-     * validation (presence + type for top-level required fields) before
-     * dispatching. Exceptions thrown by the tool handler are caught and
-     * surfaced as {@code ToolResult.error(...)} so the transport layer never
-     * sees an unchecked throw.
+     * Invoke {@code toolName} with the provided JSON on behalf of {@code caller}.
+     * Order of operations:
+     * <ol>
+     *   <li>Tool lookup — unknown name → error.</li>
+     *   <li>Authorization — denied caller → error <em>before</em> schema details
+     *       leak.</li>
+     *   <li>Shallow schema validation (presence + type for required fields).</li>
+     *   <li>Dispatch — handler exceptions are caught and surfaced as
+     *       {@code ToolResult.error(...)} so the transport never sees an
+     *       unchecked throw.</li>
+     * </ol>
      */
-    public ToolResult invoke(String toolName, JsonNode input) {
+    public ToolResult invoke(String toolName, JsonNode input, Caller caller) {
         Objects.requireNonNull(toolName, "toolName");
+        Objects.requireNonNull(caller, "caller");
         Tool tool = tools.get(toolName);
         if (tool == null) {
             return ToolResult.error("Unknown tool: " + toolName);
+        }
+        ToolPermission required = tool.permission();
+        if (!authorizer.allows(caller, required)) {
+            log.warn("Tool {} denied: caller kind={} id={} lacks {}",
+                    toolName, caller.kind(), caller.id(), required);
+            return ToolResult.error(
+                    "Permission denied: " + toolName + " requires " + required
+                            + "; caller " + caller.kind() + ":" + caller.id() + " lacks it");
         }
         if (input == null || input.isNull()) {
             input = MAPPER.createObjectNode();
@@ -68,7 +91,8 @@ public final class ToolRegistry {
             return ToolResult.error(validationError);
         }
         try {
-            ToolResult result = tool.invoke(input);
+            InvocationContext context = new InvocationContext(caller, Instant.now());
+            ToolResult result = tool.invoke(input, context);
             return result != null ? result : ToolResult.error("Tool returned null");
         } catch (RuntimeException e) {
             log.warn("Tool {} threw: {}", toolName, e.toString());

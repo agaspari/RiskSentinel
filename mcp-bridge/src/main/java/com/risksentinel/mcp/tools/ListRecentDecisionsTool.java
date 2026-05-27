@@ -3,8 +3,10 @@ package com.risksentinel.mcp.tools;
 import tools.jackson.databind.JsonNode;
 import com.risksentinel.core.audit.AuditLog;
 import com.risksentinel.core.audit.DecisionRecord;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.Json;
 import com.risksentinel.mcp.Tool;
+import com.risksentinel.mcp.ToolPermission;
 import com.risksentinel.mcp.ToolResult;
 import com.risksentinel.mcp.ToolSchemas;
 
@@ -23,6 +25,8 @@ public final class ListRecentDecisionsTool implements Tool {
         this.auditLog = Objects.requireNonNull(auditLog, "auditLog");
     }
 
+    @Override public ToolPermission permission() { return ToolPermission.READ_ONLY; }
+
     @Override public String name() { return "list_recent_decisions"; }
 
     @Override public String description() {
@@ -38,7 +42,7 @@ public final class ListRecentDecisionsTool implements Tool {
                         "limit", ToolSchemas.field("integer", "Maximum rows to return (1-" + MAX_LIMIT + ")")));
     }
 
-    @Override public ToolResult invoke(JsonNode input) {
+    @Override public ToolResult invoke(JsonNode input, InvocationContext context) {
         String portfolioId = input.path("portfolioId").asText();
         int limit = input.path("limit").asInt();
         if (limit <= 0) {

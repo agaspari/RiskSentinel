@@ -1,5 +1,6 @@
 package com.risksentinel.analyst.tools;
 
+import com.risksentinel.core.audit.Caller;
 import com.risksentinel.mcp.Tool;
 import com.risksentinel.mcp.ToolRegistry;
 import com.risksentinel.mcp.ToolResult;
@@ -48,10 +49,12 @@ public final class LangChain4jToolBridge {
     private static final Logger log = LoggerFactory.getLogger(LangChain4jToolBridge.class);
 
     private final ToolRegistry registry;
+    private final Caller caller;
     private final ObjectMapper jsonMapper;
 
-    public LangChain4jToolBridge(ToolRegistry registry, ObjectMapper jsonMapper) {
+    public LangChain4jToolBridge(ToolRegistry registry, Caller caller, ObjectMapper jsonMapper) {
         this.registry = Objects.requireNonNull(registry, "registry");
+        this.caller = Objects.requireNonNull(caller, "caller");
         this.jsonMapper = Objects.requireNonNull(jsonMapper, "jsonMapper");
     }
 
@@ -95,7 +98,7 @@ public final class LangChain4jToolBridge {
             }
         }
 
-        ToolResult result = registry.invoke(request.name(), input);
+        ToolResult result = registry.invoke(request.name(), input, caller);
         return ToolExecutionResultMessage.from(request, result.content());
     }
 

@@ -2,8 +2,10 @@ package com.risksentinel.mcp.tools;
 
 import tools.jackson.databind.JsonNode;
 import com.risksentinel.core.domain.Instrument;
+import com.risksentinel.mcp.InvocationContext;
 import com.risksentinel.mcp.Json;
 import com.risksentinel.mcp.Tool;
+import com.risksentinel.mcp.ToolPermission;
 import com.risksentinel.mcp.ToolResult;
 import com.risksentinel.mcp.ToolSchemas;
 
@@ -20,6 +22,8 @@ public final class GetInstrumentTool implements Tool {
         this.registry = Map.copyOf(Objects.requireNonNull(registry, "registry"));
     }
 
+    @Override public ToolPermission permission() { return ToolPermission.READ_ONLY; }
+
     @Override public String name() { return "get_instrument"; }
 
     @Override public String description() {
@@ -32,7 +36,7 @@ public final class GetInstrumentTool implements Tool {
                 Map.of("symbol", ToolSchemas.field("string", "Instrument symbol, e.g. AAPL")));
     }
 
-    @Override public ToolResult invoke(JsonNode input) {
+    @Override public ToolResult invoke(JsonNode input, InvocationContext context) {
         String symbol = input.path("symbol").asText();
         Instrument instrument = registry.get(symbol);
         if (instrument == null) {

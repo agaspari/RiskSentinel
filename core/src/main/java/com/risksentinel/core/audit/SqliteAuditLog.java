@@ -47,15 +47,18 @@ public final class SqliteAuditLog implements AuditLog {
             this.insertStmt = conn.prepareStatement(
                     "INSERT INTO decisions ("
                             + "proposal_id, portfolio_id, symbol, side, quantity, limit_price,"
-                            + " snapshot_id, decision_type, first_reject_code, reasons_json, decided_at_micros)"
-                            + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                            + " snapshot_id, decision_type, first_reject_code, reasons_json, decided_at_micros,"
+                            + " caller_kind, caller_id)"
+                            + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             this.findByIdStmt = conn.prepareStatement(
                     "SELECT proposal_id, portfolio_id, symbol, side, quantity, limit_price,"
-                            + " snapshot_id, decision_type, first_reject_code, reasons_json, decided_at_micros"
+                            + " snapshot_id, decision_type, first_reject_code, reasons_json, decided_at_micros,"
+                            + " caller_kind, caller_id"
                             + " FROM decisions WHERE proposal_id = ?");
             this.findByPortfolioStmt = conn.prepareStatement(
                     "SELECT proposal_id, portfolio_id, symbol, side, quantity, limit_price,"
-                            + " snapshot_id, decision_type, first_reject_code, reasons_json, decided_at_micros"
+                            + " snapshot_id, decision_type, first_reject_code, reasons_json, decided_at_micros,"
+                            + " caller_kind, caller_id"
                             + " FROM decisions WHERE portfolio_id = ?"
                             + " ORDER BY decided_at_micros DESC LIMIT ?");
             this.countStmt = conn.prepareStatement("SELECT COUNT(*) FROM decisions");
@@ -90,12 +93,47 @@ public final class SqliteAuditLog implements AuditLog {
                         ins.setInt(1, AuditSchema.CURRENT_VERSION);
                         ins.executeUpdate();
                     }
+                } else {
+                    int found = rs.getInt(1);
+                    migrateIfNeeded(st, found);
                 }
             }
             conn.commit();
         } finally {
             conn.setAutoCommit(true);
         }
+    }
+
+    private void migrateIfNeeded(Statement st, int from) throws SQLException {
+        if (from == AuditSchema.CURRENT_VERSION) {
+            return;
+        }
+        if (from == 1 && AuditSchema.CURRENT_VERSION == 2) {
+            // v1 had no caller columns; CREATE TABLE IF NOT EXISTS above did not
+            // add them because the table already existed. Add them now.
+            if (!columnExists(st, "decisions", "caller_kind")) {
+                st.execute(AuditSchema.ALTER_ADD_CALLER_KIND);
+            }
+            if (!columnExists(st, "decisions", "caller_id")) {
+                st.execute(AuditSchema.ALTER_ADD_CALLER_ID);
+            }
+            st.execute("UPDATE schema_version SET version = " + AuditSchema.CURRENT_VERSION);
+            return;
+        }
+        throw new IllegalStateException(
+                "Unsupported audit DB schema version " + from
+                        + " (this build understands up to " + AuditSchema.CURRENT_VERSION + ")");
+    }
+
+    private static boolean columnExists(Statement st, String table, String column) throws SQLException {
+        try (ResultSet rs = st.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void verifySchemaVersion() throws SQLException {
@@ -133,6 +171,16 @@ public final class SqliteAuditLog implements AuditLog {
                 }
                 insertStmt.setString(10, record.reasonsJson());
                 insertStmt.setLong(11, toMicros(record.decidedAt()));
+                if (record.callerKind() == null) {
+                    insertStmt.setNull(12, java.sql.Types.VARCHAR);
+                } else {
+                    insertStmt.setString(12, record.callerKind().name());
+                }
+                if (record.callerId() == null) {
+                    insertStmt.setNull(13, java.sql.Types.VARCHAR);
+                } else {
+                    insertStmt.setString(13, record.callerId());
+                }
                 insertStmt.executeUpdate();
             } catch (SQLException e) {
                 throw new IllegalStateException(
@@ -202,6 +250,9 @@ public final class SqliteAuditLog implements AuditLog {
     }
 
     private static DecisionRecord mapRow(ResultSet rs) throws SQLException {
+        String callerKindStr = rs.getString("caller_kind");
+        Caller.CallerKind callerKind = callerKindStr == null ? null : Caller.CallerKind.valueOf(callerKindStr);
+        String callerId = rs.getString("caller_id");
         return new DecisionRecord(
                 rs.getString("proposal_id"),
                 rs.getString("portfolio_id"),
@@ -213,7 +264,8 @@ public final class SqliteAuditLog implements AuditLog {
                 DecisionType.valueOf(rs.getString("decision_type")),
                 rs.getString("first_reject_code"),
                 rs.getString("reasons_json"),
-                fromMicros(rs.getLong("decided_at_micros")));
+                fromMicros(rs.getLong("decided_at_micros")),
+                callerKind, callerId);
     }
 
     private static long toMicros(Instant i) {
